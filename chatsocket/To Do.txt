@@ -1,0 +1,14 @@
+- User is online - offline
+- store messages on backend if reciever cannot be reached
+- add notification
+- message delivered - seen
+- add encryption. Each chat will have its own key, same on both devices. Encrypt messages with that key before saving.
+    * When updating the key, first wait for confirmation from other user so they both acknowledge the key update
+- create a random key for each user, store it on backend, store chat's keys by encrypting the key with that key. Don't store user key on device, 
+    retrieve that key after login and use it.
+- when new message is recieved, scroll to bottom?
+- websocket disconnects after inactivity
+- what to do when websocket disconnects
+- what to do if message can't be sent
+- what to do if there is no internet connection (dont allow sending new messages)
+- try the condition where i am in chat of user a and user b sends message

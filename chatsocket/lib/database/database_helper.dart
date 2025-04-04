@@ -1,0 +1,257 @@
+import 'package:sqflite/sqflite.dart';
+import 'package:path/path.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:chatsocket/models/user.dart';
+import 'package:chatsocket/models/message.dart';
+import 'package:chatsocket/models/chat.dart';
+
+class DatabaseHelper {
+  static final DatabaseHelper instance = DatabaseHelper._();
+  static Database? _database;
+
+  DatabaseHelper._();
+
+  Future<Database> get database async {
+    if (_database != null) return _database!;
+    _database = await _initDatabase();
+    return _database!;
+  }
+
+  _initDatabase() async {
+    final dbPath = await getDatabasesPath();
+    return openDatabase(
+      join(dbPath, 'chat_app.db'),
+      version: 1,
+      onCreate: (db, version) async {
+        await db.execute('''
+          CREATE TABLE users(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL UNIQUE,
+            email TEXT,
+            first_name TEXT,
+            last_name TEXT,
+            jwt_token TEXT
+          );
+        ''');
+
+        await db.execute('''
+          CREATE TABLE chats(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            chat_username TEXT NOT NULL UNIQUE, 
+            latest_message TEXT DEFAULT 'No messages yet',
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+          );
+        ''');
+
+        await db.execute('''
+          CREATE TABLE messages(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            text TEXT NOT NULL,
+            user_id INTEGER NOT NULL,
+            chat_id INTEGER NOT NULL,
+            type INTEGER NOT NULL DEFAULT 0,  -- 0 for received, 1 for sent
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY(chat_id) REFERENCES chats(id) ON DELETE CASCADE
+          );
+        ''');
+
+        // Trigger to auto-update `updated_at` when `latest_message` changes
+        await db.execute('''
+          CREATE TRIGGER update_chat_timestamp
+          AFTER UPDATE OF latest_message ON chats
+          BEGIN
+            UPDATE chats SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+          END;
+        ''');
+      },
+    );
+  }
+
+  // Retrieve the logged-in user ID from SharedPreferences
+  Future<int> getLoggedInUserId() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    return prefs.getInt('user_id') ?? -1; // Default to -1 if not found
+  }
+
+  // Insert a User
+  Future<int> insertUser(User user) async {
+    final db = await database;
+    return await db.insert(
+      'users',
+      user.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  // Fetch all users
+  Future<List<User>> getUsers() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query('users');
+    return maps.map((map) => User.fromMap(map)).toList();
+  }
+
+  // Get user by username
+  Future<User?> getUserByUsername(String username) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'users',
+      where: 'username = ?',
+      whereArgs: [username],
+    );
+
+    if (maps.isNotEmpty) {
+      return User.fromMap(maps.first);
+    }
+    return null;
+  }
+
+  // Insert a new Chat (Automatically uses logged-in user)
+  Future<int?> insertChat(String chatUsername) async {
+    final db = await database;
+    int userId = await getLoggedInUserId();
+    if (userId == -1) return null; // User ID not found, don't insert
+
+    // Insert the new chat into the 'chats' table and get the inserted chatId
+    int chatId = await db.insert('chats', {
+      'user_id': userId,
+      'chat_username': chatUsername,
+      'latest_message': 'No messages yet',
+      'updated_at': DateTime.now().toIso8601String(),
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+
+    return chatId; // Return the chatId (inserted record ID)
+  }
+
+  // Get all chats for the logged-in user
+  Future<List<Chat>> getChatsForLoggedInUser() async {
+    final db = await database;
+    int userId = await getLoggedInUserId();
+    if (userId == -1) return []; // No user logged in
+    print("logged in user id ${userId}");
+
+    final List<Map<String, dynamic>> maps = await db.query(
+      'chats',
+      where: 'user_id = ?',
+      whereArgs: [userId],
+      orderBy: 'updated_at DESC', // Most recent chats first
+    );
+    return maps.map((map) => Chat.fromMap(map)).toList();
+  }
+
+  // Insert a Message (Uses logged-in user ID)
+  // Insert a Message (Uses logged-in user ID)
+  Future<int> insertMessage(Message message) async {
+    final db = await database;
+    int userId = await getLoggedInUserId();
+    if (userId == -1) return 0; // No user logged in
+
+    // Fetch chat details to get the sender
+    List<Map<String, dynamic>> chatData = await db.query(
+      'chats',
+      columns: ['chat_username'], // Assuming `chat_username` stores the sender
+      where: 'id = ?',
+      whereArgs: [message.chatId],
+    );
+
+    if (chatData.isEmpty) {
+      print("Chat not found for message insertion.");
+      return 0;
+    }
+
+    String chatSender = chatData.first['chat_username'];
+    print("Sender: $chatSender"); // Debugging print
+
+    int messageId = await db.insert('messages', {
+      'text': message.text,
+      'user_id': userId,
+      'chat_id': message.chatId,
+      'type': message.type ? 1 : 0, // Insert the type field
+      'created_at': DateTime.now().toIso8601String(),
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+
+    print("Message inserted with ID: $messageId");
+
+    // Update latest message in Chat (Trigger will update `updated_at`)
+    int updateCount = await db.update(
+      'chats',
+      {
+        'latest_message':
+            message.text.length > 16
+                ? '${message.text.substring(0, 16)}...'
+                : message.text,
+      },
+      where: 'id = ?',
+      whereArgs: [message.chatId],
+    );
+
+    print("Rows updated in chats table: $updateCount"); // Debugging print
+
+    return messageId;
+  }
+
+  // Update User
+  Future<int> updateUser(User user) async {
+    final db = await database;
+    return await db.update(
+      'users',
+      user.toMap(),
+      where: 'username = ?',
+      whereArgs: [user.username],
+    );
+  }
+
+  // Get all messages for a chat (For logged-in user)
+  Future<List<Message>> getMessagesByChat(int chatId) async {
+    final db = await database;
+    int userId = await getLoggedInUserId();
+    if (userId == -1) return []; // No user logged in
+
+    final List<Map<String, dynamic>> maps = await db.query(
+      'messages',
+      where: 'chat_id = ? AND user_id = ?',
+      whereArgs: [chatId, userId],
+    );
+    return maps.map((map) => Message.fromMap(map)).toList();
+  }
+
+  // Get the last 20 messages for a chat (initial load)
+  Future<List<Message>> getLastMessagesByChat(int chatId, int limit) async {
+    final db = await database;
+    int userId = await getLoggedInUserId();
+    if (userId == -1) return [];
+
+    final List<Map<String, dynamic>> maps = await db.query(
+      'messages',
+      where: 'chat_id = ? AND user_id = ?',
+      whereArgs: [chatId, userId],
+      orderBy: 'created_at DESC', // Newest first
+      limit: limit,
+    );
+
+    return maps.map((map) => Message.fromMap(map)).toList().reversed.toList();
+  }
+
+  // Get older messages before a specific message ID (pagination)
+  Future<List<Message>> getOlderMessagesByChat(
+    int chatId,
+    int lastMessageId,
+    int limit,
+  ) async {
+    final db = await database;
+    int userId = await getLoggedInUserId();
+    if (userId == -1) return [];
+
+    final List<Map<String, dynamic>> maps = await db.query(
+      'messages',
+      where: 'chat_id = ? AND user_id = ? AND id < ?',
+      whereArgs: [chatId, userId, lastMessageId],
+      orderBy: 'created_at DESC',
+      limit: limit,
+    );
+
+    return maps.map((map) => Message.fromMap(map)).toList().reversed.toList();
+  }
+}
