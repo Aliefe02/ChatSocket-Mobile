@@ -134,7 +134,7 @@ class _ChatScreenState extends State<ChatScreen> {
   // Called when a new message is received through WebSocket
   void _onMessageReceived(String sender, String message) async {
     print("[chat_screen] Received message from $sender: $message");
-
+    DateTime now = DateTime.now();
     int userId = await getLoggedInUserId();
 
     // Create a new Message object for the received message
@@ -163,11 +163,12 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     }
 
-    await DatabaseHelper.instance.insertMessage(receivedMessage);
+    await DatabaseHelper.instance.insertMessage(receivedMessage, now);
   }
 
   // Send a message
   void _sendMessage() async {
+    DateTime now = DateTime.now();
     // Marked the function as async
     if (_controller.text.isNotEmpty) {
       String message = _controller.text;
@@ -188,13 +189,13 @@ class _ChatScreenState extends State<ChatScreen> {
       });
 
       // Send the message through the WebSocket service
-      _webSocketService.sendMessage(message, widget.username);
+      _webSocketService.sendMessage(message, widget.username, now);
 
       // Clear the input field
       _controller.clear();
 
       // Insert the message into the database asynchronously
-      await DatabaseHelper.instance.insertMessage(newMessage);
+      await DatabaseHelper.instance.insertMessage(newMessage, now);
 
       // Scroll to the bottom of the chat
       _scrollToBottom();

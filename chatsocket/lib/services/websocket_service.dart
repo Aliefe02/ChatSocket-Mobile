@@ -16,7 +16,7 @@ class WebSocketService {
   String? _authToken;
   final List<MessageCallback> _listeners = [];
   final List<MessageCallback> _messageListeners = [];
-  final List<String> _chats = [];
+  Map<String, List<String>> _chats = {};
   final Map<String, String> _latestMessages = {};
   final Map<String, int> chatUsernameToChatId = {};
 
@@ -66,18 +66,19 @@ class WebSocketService {
   }
 
   void _handleIncomingMessage(String rawMessage) async {
+    DateTime now = DateTime.now();
     var data = jsonDecode(rawMessage);
     String sender = data['sender'];
     String msg = data['message'];
 
     print("[websocket] Received message from $sender: $msg"); // Debugging
 
-    if (!_chats.contains(sender)) {
+    if (!_chats.containsKey(sender)) {
       await createNewChat(sender);
     }
 
     // Update the latest message in memory
-    updateLatestMessage(sender, msg);
+    updateLatestMessage(sender, msg, now);
 
     // Notify listeners (to update UI)
     if (_messageListeners.isNotEmpty) {
@@ -93,11 +94,11 @@ class WebSocketService {
         type: false, // Received by the user
         chatId: getChatIdByUsername(sender) ?? -1,
       );
-      await DatabaseHelper.instance.insertMessage(receivedMessage);
+      await DatabaseHelper.instance.insertMessage(receivedMessage, now);
     }
   }
 
-  void sendMessage(String message, String recipient) async {
+  void sendMessage(String message, String recipient, DateTime sentAt) async {
     if (_socket != null) {
       // Send the message to the server
       _socket!.add(
@@ -109,7 +110,7 @@ class WebSocketService {
       );
 
       // Update the latest message in memory
-      updateLatestMessage(recipient, message); // Update UI and memory
+      updateLatestMessage(recipient, message, sentAt); // Update UI and memory
     } else {
       print("WebSocket is not connected.");
     }
@@ -117,27 +118,42 @@ class WebSocketService {
 
   Future<void> createNewChat(String username) async {
     int userId = await getLoggedInUserId();
-    if (!_chats.contains(username)) {
-      _chats.add(username);
 
-      // Retrieve the chatId
-      int? chatId = await DatabaseHelper.instance.getChatIdByUsername(
+    // Check if the chat already exists in _chats
+    if (!_chats.containsKey(username)) {
+      // If the chat doesn't exist, retrieve it from the database or create a new one
+      Chat? chat = await DatabaseHelper.instance.getChatByUsername(
         username,
         userId,
       );
 
-      // Use null-aware assignment to insert the chat if chatId is null
-      chatId ??= await DatabaseHelper.instance.insertChat(username) ?? -1;
-      print(chatId);
+      // If the chat is null (not found), create it and retrieve the Chat object
+      chat ??= await DatabaseHelper.instance.insertChat(username);
 
-      // Store the chatUsername to chatId mapping
-      chatUsernameToChatId[username] = chatId;
-      print("New chat created: $username with chatId $chatId"); // Debugging
+      // Add the chat to _chats if it's not already added
+      if (chat != null) {
+        _chats[username] = [
+          chat.id.toString(), // chat ID
+          chat.latestMessage, // latest message
+          "0", // unread message count (default to 0)
+          chat.updatedAt.toString(), // last updated datetime
+        ];
+        print("New chat created for $username with chatId ${chat.id}");
+      }
+    } else {
+      print("Chat for $username already exists in _chats");
     }
   }
 
-  void updateLatestMessage(String chatUsername, String latestMessage) {
-    _latestMessages[chatUsername] = latestMessage;
+  void updateLatestMessage(
+    String chatUsername,
+    String latestMessage,
+    DateTime updatedAt,
+  ) {
+    _chats[chatUsername]?[1] = latestMessage;
+    _chats[chatUsername]?[3] = updatedAt.toString();
+
+    sortChatsByUpdatedAt();
 
     // Notify listeners about the new latest message
     for (var listener in _listeners) {
@@ -150,10 +166,6 @@ class WebSocketService {
     _latestMessages.clear();
   }
 
-  String getLastMessage(String username) {
-    return _latestMessages[username] ?? 'No messages yet'; // Default message
-  }
-
   Future<void> loadChatsFromDatabase(int userId) async {
     // Fetch chats from the database
     List<Chat> dbChats =
@@ -161,13 +173,13 @@ class WebSocketService {
 
     // Iterate through each chat and map chatUsername to chatId
     for (Chat chat in dbChats) {
-      if (!_chats.contains(chat.chatUsername)) {
-        _chats.add(chat.chatUsername);
-        _latestMessages[chat.chatUsername] = chat.latestMessage;
-
-        // Map the chatUsername to chatId
-        chatUsernameToChatId[chat.chatUsername] = chat.id ?? -1;
-
+      if (!_chats.containsKey(chat.chatUsername)) {
+        _chats[chat.chatUsername] = [
+          chat.id.toString(), // chat ID
+          chat.latestMessage, // latest message
+          "0", // unread message count (default to 0)
+          chat.updatedAt.toString(), // last updated datetime
+        ];
         print(
           "Chat loaded: ${chat.chatUsername} with chatId ${chat.id}",
         ); // Debugging
@@ -205,15 +217,15 @@ class WebSocketService {
 
         for (var sender in result.keys) {
           List<List<String>> senderMessages = result[sender]!;
-          print(sender);
 
-          int? chatId = await DatabaseHelper.instance.getChatIdByUsername(
+          Chat? chat = await DatabaseHelper.instance.getChatByUsername(
             sender,
             userId,
           );
-          print(chatId);
 
-          chatId ??= await DatabaseHelper.instance.insertChat(sender) ?? -1;
+          chat ??= await DatabaseHelper.instance.insertChat(sender);
+
+          int chatId = chat?.id ?? -1;
 
           List<Message> messagesToSave = [];
 
@@ -232,8 +244,6 @@ class WebSocketService {
             );
             messagesToSave.add(receivedMessage);
           }
-          print(chatId);
-          print(messagesToSave);
 
           await DatabaseHelper.instance.insertMessagesBulk(messagesToSave);
         }
@@ -266,17 +276,38 @@ class WebSocketService {
     }
   }
 
+  void sortChatsByUpdatedAt() {
+    // Convert _chats map to a list of Map entries
+    var sortedChats = _chats.entries.toList();
+
+    // Sort the list by the `updatedAt` value (String) in descending order
+    sortedChats.sort((a, b) {
+      // Convert the updatedAt strings to DateTime and compare them
+      DateTime aDate = DateTime.parse(a.value[3]);
+      DateTime bDate = DateTime.parse(b.value[3]);
+      return bDate.compareTo(aDate); // Sorting in descending order
+    });
+
+    // Optionally, convert it back to a Map if you want
+    _chats = Map.fromEntries(sortedChats);
+  }
+
   void disconnect() {
     _socket?.close();
     _socket = null;
     print("WebSocket disconnected.");
   }
 
-  List<String> getChatUsers() {
+  Map<String, List<String>> getChatUsers() {
+    sortChatsByUpdatedAt();
     return _chats;
   }
 
   int? getChatIdByUsername(String username) {
-    return chatUsernameToChatId[username];
+    return int.parse(_chats[username]?[0] ?? "-1");
+  }
+
+  String getLastMessage(String username) {
+    return _chats[username]?[1] ?? "No messages yet";
   }
 }

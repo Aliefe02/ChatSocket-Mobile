@@ -3,9 +3,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:chatsocket/services/websocket_service.dart';
 import 'chat_screen.dart';
 import 'profile_page.dart';
+import 'package:http/http.dart' as http;
 import 'package:chatsocket/database/database_helper.dart';
 import 'package:chatsocket/models/chat.dart';
 import 'package:chatsocket/models/user.dart';
+import 'package:chatsocket/constants.dart';
 
 class MainPage extends StatefulWidget {
   final String username;
@@ -17,9 +19,11 @@ class MainPage extends StatefulWidget {
 }
 
 class _MainPageState extends State<MainPage> {
+  String? _authToken = '';
   final WebSocketService _webSocketService = WebSocketService.getInstance();
   bool _showInputBox = false;
   final TextEditingController _usernameController = TextEditingController();
+  Color _inputBorderColor = Colors.transparent;
 
   @override
   void initState() {
@@ -50,27 +54,53 @@ class _MainPageState extends State<MainPage> {
 
   Future<int> getLoggedInUserId() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    return prefs.getInt('user_id') ?? -1; // Default to -1 if not found
+    return prefs.getInt('user_id') ?? -1;
   }
 
-  void _startNewChat() {
+  void _startNewChat() async {
     String newUsername = _usernameController.text.trim();
     if (newUsername.isNotEmpty) {
-      if (!_webSocketService.getChatUsers().contains(newUsername)) {
-        _webSocketService.createNewChat(
-          newUsername,
-        ); // Create a new chat if it doesn't exist
+      if (_authToken == '') {
+        SharedPreferences prefs = await SharedPreferences.getInstance();
+        _authToken = prefs.getString('jwt_token');
       }
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => ChatScreen(username: newUsername),
-        ),
+      final url = Uri.parse("$BASE_URL/api/user/exists?username=$newUsername");
+
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $_authToken',
+        },
       );
-      _usernameController.clear();
-      setState(() {
-        _showInputBox = false;
-      });
+
+      bool exists = response.statusCode == 200;
+
+      if (exists) {
+        setState(() {
+          _inputBorderColor = Colors.transparent; // Reset border color if valid
+        });
+
+        if (!_webSocketService.getChatUsers().containsKey(newUsername)) {
+          _webSocketService.createNewChat(newUsername);
+        }
+
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ChatScreen(username: newUsername),
+          ),
+        );
+
+        _usernameController.clear();
+        setState(() {
+          _showInputBox = false;
+        });
+      } else {
+        setState(() {
+          _inputBorderColor = Colors.red; // Show red border on invalid username
+        });
+      }
     }
   }
 
@@ -108,7 +138,8 @@ class _MainPageState extends State<MainPage> {
 
   @override
   Widget build(BuildContext context) {
-    List<String> chatUsers = _webSocketService.getChatUsers();
+    Map<String, List<String>> chatUsers = _webSocketService.getChatUsers();
+    List<String> chatKeys = chatUsers.keys.toList();
 
     return Scaffold(
       appBar: AppBar(title: Text('ChatSocket'), elevation: 0),
@@ -181,8 +212,26 @@ class _MainPageState extends State<MainPage> {
                         fillColor: Colors.grey[900],
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(30),
-                          borderSide: BorderSide.none,
+                          borderSide: BorderSide(
+                            color: _inputBorderColor,
+                            width: 2,
+                          ),
                         ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(30),
+                          borderSide: BorderSide(
+                            color: _inputBorderColor,
+                            width: 2,
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(30),
+                          borderSide: BorderSide(
+                            color: _inputBorderColor,
+                            width: 2,
+                          ),
+                        ),
+
                         contentPadding: EdgeInsets.symmetric(horizontal: 20),
                       ),
                       style: TextStyle(color: Colors.white),
@@ -206,12 +255,11 @@ class _MainPageState extends State<MainPage> {
                 10,
               ), // Optional: rounded corners for the scrollbar
               child: ListView.builder(
-                itemCount: chatUsers.length,
+                itemCount: chatKeys.length,
                 itemBuilder: (context, index) {
-                  String username = chatUsers[index];
-                  String lastMessage = _webSocketService.getLastMessage(
-                    username,
-                  );
+                  String username = chatKeys[index];
+                  List<String>? chatDetails = chatUsers[username];
+                  String lastMessage = chatDetails?[1] ?? "";
                   return Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 8.0,

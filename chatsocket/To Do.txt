@@ -1,5 +1,4 @@
 - User is online - offline
-- store messages on backend if reciever cannot be reached
 - add notification
 - message delivered - seen
 - add encryption. Each chat will have its own key, same on both devices. Encrypt messages with that key before saving.
@@ -12,3 +11,4 @@
 - what to do if message can't be sent
 - what to do if there is no internet connection (dont allow sending new messages)
 - try the condition where i am in chat of user a and user b sends message
+- order chats by updatedAt after new message is sent - received

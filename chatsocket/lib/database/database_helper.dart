@@ -109,7 +109,7 @@ class DatabaseHelper {
   }
 
   // Insert a new Chat (Automatically uses logged-in user)
-  Future<int?> insertChat(String chatUsername) async {
+  Future<Chat?> insertChat(String chatUsername) async {
     print("Save new chat called");
     final db = await database;
     int userId = await getLoggedInUserId();
@@ -123,7 +123,34 @@ class DatabaseHelper {
       'updated_at': DateTime.now().toIso8601String(),
     }, conflictAlgorithm: ConflictAlgorithm.replace);
 
-    return chatId; // Return the chatId (inserted record ID)
+    // Retrieve the newly inserted chat from the database using its chatId
+    Chat chat = await getChatById(chatId);
+
+    return chat; // Return the complete Chat object
+  }
+
+  Future<Chat> getChatById(int chatId) async {
+    final db = await database;
+
+    // Query the 'chats' table to retrieve the chat by its ID
+    List<Map<String, dynamic>> results = await db.query(
+      'chats',
+      where: 'id = ?',
+      whereArgs: [chatId],
+    );
+
+    if (results.isNotEmpty) {
+      // Assuming the Chat object is constructed using these fields
+      return Chat(
+        id: results[0]['id'],
+        userId: results[0]['userId'],
+        chatUsername: results[0]['chat_username'],
+        latestMessage: results[0]['latest_message'],
+        updatedAt: results[0]['updated_at'],
+      );
+    } else {
+      throw Exception("Chat not found");
+    }
   }
 
   // Get all chats for the logged-in user
@@ -144,7 +171,7 @@ class DatabaseHelper {
 
   // Insert a Message (Uses logged-in user ID)
   // Insert a Message (Uses logged-in user ID)
-  Future<int> insertMessage(Message message) async {
+  Future<int> insertMessage(Message message, DateTime createdAt) async {
     print("Save message on db called");
     final db = await database;
     int userId = await getLoggedInUserId();
@@ -153,7 +180,7 @@ class DatabaseHelper {
     // Fetch chat details to get the sender
     List<Map<String, dynamic>> chatData = await db.query(
       'chats',
-      columns: ['chat_username'], // Assuming `chat_username` stores the sender
+      columns: ['chat_username'],
       where: 'id = ?',
       whereArgs: [message.chatId],
     );
@@ -171,7 +198,7 @@ class DatabaseHelper {
       'user_id': userId,
       'chat_id': message.chatId,
       'type': message.type ? 1 : 0, // Insert the type field
-      'created_at': DateTime.now().toIso8601String(),
+      'created_at': createdAt.toIso8601String(),
     }, conflictAlgorithm: ConflictAlgorithm.replace);
 
     print("Message inserted with ID: $messageId");
@@ -233,6 +260,25 @@ class DatabaseHelper {
 
     if (result.isNotEmpty) {
       return result.first['id'] as int?;
+    } else {
+      return null; // Return null if no matching chat found
+    }
+  }
+
+  Future<Chat?> getChatByUsername(String chatUsername, int userId) async {
+    final db =
+        await database; // Assuming you have a method to get the database instance
+
+    // Query the database to find the chatId by username
+    final List<Map<String, dynamic>> result = await db.query(
+      'chats', // Assuming 'chats' is the table name
+      where:
+          'chat_username = ? AND user_id = ?', // The column name for the username
+      whereArgs: [chatUsername, userId],
+    );
+
+    if (result.isNotEmpty) {
+      return Chat.fromMap(result.first);
     } else {
       return null; // Return null if no matching chat found
     }
