@@ -38,7 +38,7 @@ class DatabaseHelper {
           CREATE TABLE chats(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL,
-            chat_username TEXT NOT NULL UNIQUE, 
+            chat_username TEXT NOT NULL, 
             latest_message TEXT DEFAULT 'No messages yet',
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -110,6 +110,7 @@ class DatabaseHelper {
 
   // Insert a new Chat (Automatically uses logged-in user)
   Future<int?> insertChat(String chatUsername) async {
+    print("Save new chat called");
     final db = await database;
     int userId = await getLoggedInUserId();
     if (userId == -1) return null; // User ID not found, don't insert
@@ -144,6 +145,7 @@ class DatabaseHelper {
   // Insert a Message (Uses logged-in user ID)
   // Insert a Message (Uses logged-in user ID)
   Future<int> insertMessage(Message message) async {
+    print("Save message on db called");
     final db = await database;
     int userId = await getLoggedInUserId();
     if (userId == -1) return 0; // No user logged in
@@ -217,6 +219,25 @@ class DatabaseHelper {
     return maps.map((map) => Message.fromMap(map)).toList();
   }
 
+  Future<int?> getChatIdByUsername(String chatUsername, int userId) async {
+    final db =
+        await database; // Assuming you have a method to get the database instance
+
+    // Query the database to find the chatId by username
+    final List<Map<String, dynamic>> result = await db.query(
+      'chats', // Assuming 'chats' is the table name
+      where:
+          'chat_username = ? AND user_id = ?', // The column name for the username
+      whereArgs: [chatUsername, userId],
+    );
+
+    if (result.isNotEmpty) {
+      return result.first['id'] as int?;
+    } else {
+      return null; // Return null if no matching chat found
+    }
+  }
+
   // Get the last 20 messages for a chat (initial load)
   Future<List<Message>> getLastMessagesByChat(int chatId, int limit) async {
     final db = await database;
@@ -253,5 +274,62 @@ class DatabaseHelper {
     );
 
     return maps.map((map) => Message.fromMap(map)).toList().reversed.toList();
+  }
+
+  Future<void> insertMessagesBulk(List<Message> messages) async {
+    final db = await database;
+
+    // Begin a transaction for bulk insert
+    await db.transaction((txn) async {
+      // Create a batch insert
+      Batch batch = txn.batch();
+
+      // Loop through all messages
+      for (var i = 0; i < messages.length; i++) {
+        var message = messages[i];
+
+        // Add message to batch insert
+        batch.insert(
+          'messages',
+          message.toMap(includeCreatedAt: true), // Ensure to include createdAt
+          conflictAlgorithm:
+              ConflictAlgorithm.replace, // Handle duplicates if any
+        );
+
+        // Check if this is the last message in the list
+        if (i == messages.length - 1) {
+          // Fetch chat details to get the sender
+          List<Map<String, dynamic>> chatData = await txn.query(
+            'chats',
+            columns: [
+              'chat_username',
+            ], // Assuming `chat_username` stores the sender
+            where: 'id = ?',
+            whereArgs: [message.chatId],
+          );
+
+          if (chatData.isNotEmpty) {
+            String chatSender = chatData.first['chat_username'];
+            print("Sender: $chatSender"); // Debugging print
+
+            // Update the `latest_message` for the chat with the last message
+            await txn.update(
+              'chats',
+              {
+                'latest_message':
+                    message.text.length > 16
+                        ? '${message.text.substring(0, 16)}...'
+                        : message.text,
+              },
+              where: 'id = ?',
+              whereArgs: [message.chatId],
+            );
+          }
+        }
+      }
+
+      // Commit the batch
+      await batch.commit(noResult: true);
+    });
   }
 }

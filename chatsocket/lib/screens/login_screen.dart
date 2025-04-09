@@ -36,7 +36,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     // API Request: Login
-    var loginUrl = Uri.parse('$BASE_URL/user/login');
+    var loginUrl = Uri.parse('$BASE_URL/api/user/login');
     var loginResponse = await http.post(
       loginUrl,
       headers: {'Content-Type': 'application/json'},
@@ -48,7 +48,7 @@ class _LoginScreenState extends State<LoginScreen> {
       String token = loginResponse.body.trim();
 
       // API Request: Get User Details
-      var detailsUrl = Uri.parse('$BASE_URL/user/details');
+      var detailsUrl = Uri.parse('$BASE_URL/api/user/details');
       var detailsResponse = await http.get(
         detailsUrl,
         headers: {'Authorization': 'Bearer $token'}, // Attach JWT token

@@ -54,7 +54,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
 
     // API Request
-    var url = Uri.parse('$BASE_URL/user/register');
+    var url = Uri.parse('$BASE_URL/api/user/register');
     var response = await http.post(
       url,
       headers: {'Content-Type': 'application/json'},

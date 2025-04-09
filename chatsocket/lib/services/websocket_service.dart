@@ -1,9 +1,12 @@
 import 'dart:io';
+import 'package:http/http.dart' as http;
+import 'dart:async';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:chatsocket/constants.dart';
 import 'package:chatsocket/database/database_helper.dart';
 import 'package:chatsocket/models/chat.dart';
+import 'package:chatsocket/models/message.dart';
 
 typedef MessageCallback = void Function(String sender, String message);
 
@@ -34,6 +37,7 @@ class WebSocketService {
     }
 
     try {
+      // retrieveUnreceivedMessages();
       Uri uri = Uri.parse("$WS_URL/ws/chat?token=$_authToken");
       _socket = await WebSocket.connect(uri.toString());
 
@@ -69,22 +73,40 @@ class WebSocketService {
     print("[websocket] Received message from $sender: $msg"); // Debugging
 
     if (!_chats.contains(sender)) {
-      createNewChat(sender);
+      await createNewChat(sender);
     }
 
     // Update the latest message in memory
     updateLatestMessage(sender, msg);
 
     // Notify listeners (to update UI)
-    for (var listener in _messageListeners) {
-      listener(sender, msg); // This should call _onMessageReceived
+    if (_messageListeners.isNotEmpty) {
+      for (var listener in _messageListeners) {
+        listener(sender, msg); // This should call _onMessageReceived
+      }
+    } else {
+      int userId = await getLoggedInUserId();
+
+      Message receivedMessage = Message(
+        userId: userId,
+        text: msg,
+        type: false, // Received by the user
+        chatId: getChatIdByUsername(sender) ?? -1,
+      );
+      await DatabaseHelper.instance.insertMessage(receivedMessage);
     }
   }
 
   void sendMessage(String message, String recipient) async {
     if (_socket != null) {
       // Send the message to the server
-      _socket!.add(jsonEncode({"message": message, "recipient": recipient}));
+      _socket!.add(
+        jsonEncode({
+          "target": "sendMessage",
+          "message": message,
+          "recipient": recipient,
+        }),
+      );
 
       // Update the latest message in memory
       updateLatestMessage(recipient, message); // Update UI and memory
@@ -93,16 +115,23 @@ class WebSocketService {
     }
   }
 
-  void createNewChat(String username) async {
+  Future<void> createNewChat(String username) async {
+    int userId = await getLoggedInUserId();
     if (!_chats.contains(username)) {
       _chats.add(username);
 
-      // Insert the new chat into the database and get the chatId
-      int chatId = await DatabaseHelper.instance.insertChat(username) ?? -1;
+      // Retrieve the chatId
+      int? chatId = await DatabaseHelper.instance.getChatIdByUsername(
+        username,
+        userId,
+      );
+
+      // Use null-aware assignment to insert the chat if chatId is null
+      chatId ??= await DatabaseHelper.instance.insertChat(username) ?? -1;
+      print(chatId);
 
       // Store the chatUsername to chatId mapping
       chatUsernameToChatId[username] = chatId;
-
       print("New chat created: $username with chatId $chatId"); // Debugging
     }
   }
@@ -143,6 +172,81 @@ class WebSocketService {
           "Chat loaded: ${chat.chatUsername} with chatId ${chat.id}",
         ); // Debugging
       }
+    }
+  }
+
+  Future<void> retrieveUnreceivedMessages(int userId) async {
+    print("Retrieving messages");
+
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    _authToken = prefs.getString('jwt_token');
+
+    final url = Uri.parse("$BASE_URL/api/message/unreceived-messages");
+
+    try {
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $_authToken',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> parsed = jsonDecode(response.body);
+
+        final result = parsed.map((key, value) {
+          final List<List<String>> messages =
+              (value as List)
+                  .map<List<String>>((item) => List<String>.from(item))
+                  .toList();
+          return MapEntry(key, messages);
+        });
+
+        for (var sender in result.keys) {
+          List<List<String>> senderMessages = result[sender]!;
+          print(sender);
+
+          int? chatId = await DatabaseHelper.instance.getChatIdByUsername(
+            sender,
+            userId,
+          );
+          print(chatId);
+
+          chatId ??= await DatabaseHelper.instance.insertChat(sender) ?? -1;
+
+          List<Message> messagesToSave = [];
+
+          for (var message in senderMessages) {
+            String messageText = message[0];
+            String sentAt = message[1];
+
+            DateTime createdAt = DateTime.parse(sentAt);
+
+            Message receivedMessage = Message(
+              userId: userId,
+              text: messageText,
+              type: false,
+              createdAt: createdAt,
+              chatId: chatId,
+            );
+            messagesToSave.add(receivedMessage);
+          }
+          print(chatId);
+          print(messagesToSave);
+
+          await DatabaseHelper.instance.insertMessagesBulk(messagesToSave);
+        }
+        loadChatsFromDatabase(userId);
+        return;
+      } else {
+        throw Exception(
+          "Failed to load unreceived messages. Status code: ${response.statusCode}",
+        );
+      }
+    } catch (e) {
+      print("Error retrieving unreceived messages: $e");
+      rethrow;
     }
   }
 

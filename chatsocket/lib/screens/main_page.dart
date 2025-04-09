@@ -1,11 +1,10 @@
-import 'package:chatsocket/models/chat.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:chatsocket/services/websocket_service.dart';
 import 'chat_screen.dart';
 import 'profile_page.dart';
 import 'package:chatsocket/database/database_helper.dart';
-// import 'package:chatsocket/models/message.dart';
+import 'package:chatsocket/models/chat.dart';
 import 'package:chatsocket/models/user.dart';
 
 class MainPage extends StatefulWidget {
@@ -33,9 +32,10 @@ class _MainPageState extends State<MainPage> {
   }
 
   Future<void> _loadChats() async {
+    // await _webSocketService.retrieveUnreceivedMessages();
     int userId = await getLoggedInUserId();
     if (userId != -1) {
-      await _webSocketService.loadChatsFromDatabase(userId);
+      await _webSocketService.retrieveUnreceivedMessages(userId);
       setState(() {});
     }
   }
@@ -91,6 +91,7 @@ class _MainPageState extends State<MainPage> {
     List<Chat> chats = await DatabaseHelper.instance.getChatsForLoggedInUser();
 
     // Print user details to the console
+    print(chats.length);
     for (var chat in chats) {
       print(
         'id: ${chat.id}, User: ${chat.chatUsername}, latest message: ${chat.latestMessage}',
