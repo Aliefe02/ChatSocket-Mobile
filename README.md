@@ -1,12 +1,11 @@
 # ChatSocket-Mobile
 
+Mobile messaging application with Flutter.
 
-Mobile messagin application with Flutter
+## Changelog
 
+### Version 0.1
+- **Receiving unreceived messages**: Now retrieves unreceived messages when the application boots up (due to lack of socket).
+- **Fix database query bug**: Resolved an issue where `getChatIdByUsername` wasn't using the currently logged-in user for querying.
+- **Fix chat querying returning null**: Fixed the problem caused by incorrect column filtering (should be `id` instead of `chat_id`).
 
-Changelog
-
-- Version 0.1
- 1 - Receiving unreceived messages (due to lack of socket) when application boots up.
- 2 - Fix database query bug which is caused by getChatIdByUsername not using currently logged in user for querying.
- 3 - Fix chat querying returning null caused by incorrect column filtering (chat_id -> id)
