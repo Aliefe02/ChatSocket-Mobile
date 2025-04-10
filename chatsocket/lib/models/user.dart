@@ -1,10 +1,12 @@
 class User {
-  final int? id; // Nullable because it will be assigned after insertion
+  final int? id;
   final String username;
   final String email;
   final String firstName;
   final String lastName;
-  final String jwtToken; // Store JWT token
+  final String jwtToken;
+  final String publicKey;
+  final String privateKey;
 
   User({
     this.id,
@@ -13,9 +15,10 @@ class User {
     required this.firstName,
     required this.lastName,
     required this.jwtToken,
+    required this.publicKey,
+    required this.privateKey,
   });
 
-  // Convert User to Map (for storing in SQLite)
   Map<String, dynamic> toMap() {
     return {
       'id': id,
@@ -24,10 +27,11 @@ class User {
       'first_name': firstName,
       'last_name': lastName,
       'jwt_token': jwtToken,
+      'public_key': publicKey,
+      'private_key': privateKey,
     };
   }
 
-  // Convert Map to User object (for reading from SQLite)
   static User fromMap(Map<String, dynamic> map) {
     return User(
       id: map['id'],
@@ -36,6 +40,8 @@ class User {
       firstName: map['first_name'],
       lastName: map['last_name'],
       jwtToken: map['jwt_token'],
+      publicKey: map['public_key'],
+      privateKey: map['private_key'],
     );
   }
 }

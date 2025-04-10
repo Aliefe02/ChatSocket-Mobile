@@ -6,6 +6,7 @@ import 'main_page.dart';
 import 'package:chatsocket/constants.dart';
 import 'package:chatsocket/models/user.dart';
 import 'package:chatsocket/database/database_helper.dart';
+import 'package:chatsocket/services/encryption_service.dart';
 
 class LoginScreen extends StatefulWidget {
   @override
@@ -76,10 +77,13 @@ class _LoginScreenState extends State<LoginScreen> {
             firstName: firstName,
             lastName: lastName,
             jwtToken: token,
+            publicKey: existingUser.publicKey,
+            privateKey: existingUser.privateKey,
           );
           await DatabaseHelper.instance.updateUser(updatedUser);
           userId = existingUser.id; // Use existing user ID
         } else {
+          final keyMap = await EncryptionService().createKeys();
           // Insert new user into SQLite
           User newUser = User(
             username: username,
@@ -87,6 +91,8 @@ class _LoginScreenState extends State<LoginScreen> {
             firstName: firstName,
             lastName: lastName,
             jwtToken: token,
+            publicKey: keyMap['publicKey']!,
+            privateKey: keyMap['privateKey']!,
           );
           userId = await DatabaseHelper.instance.insertUser(newUser);
         }

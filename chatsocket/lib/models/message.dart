@@ -4,6 +4,7 @@ class Message {
   final int userId;
   final int chatId;
   final bool type;
+  bool read; // New field
   final DateTime? createdAt; // Nullable since the DB auto-generates it
 
   Message({
@@ -12,6 +13,7 @@ class Message {
     required this.userId,
     required this.chatId,
     required this.type,
+    required this.read, // New field
     this.createdAt, // Nullable
   });
 
@@ -23,6 +25,7 @@ class Message {
       'user_id': userId,
       'chat_id': chatId,
       'type': type ? 1 : 0,
+      'read': read ? 1 : 0, // Store as 1 (true) or 0 (false)
     };
 
     // Only include `created_at` if explicitly requested (for reading from DB)
@@ -41,6 +44,7 @@ class Message {
       userId: map['user_id'],
       chatId: map['chat_id'],
       type: map['type'] == 1,
+      read: map['read'] == 1, // Convert from 1 or 0 to bool
       createdAt:
           map['created_at'] != null
               ? DateTime.parse(map['created_at'])

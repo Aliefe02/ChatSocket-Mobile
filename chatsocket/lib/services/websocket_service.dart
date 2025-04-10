@@ -74,7 +74,12 @@ class WebSocketService {
     print("[websocket] Received message from $sender: $msg"); // Debugging
 
     if (!_chats.containsKey(sender)) {
-      await createNewChat(sender);
+      String? publicKey = await _getUserPublicKey(sender);
+      if (publicKey != null) {
+        await createNewChat(sender, publicKey);
+      } else {
+        // Handle case
+      }
     }
 
     // Update the latest message in memory
@@ -89,6 +94,7 @@ class WebSocketService {
       int userId = await getLoggedInUserId();
 
       Message receivedMessage = Message(
+        read: false,
         userId: userId,
         text: msg,
         type: false, // Received by the user
@@ -116,7 +122,7 @@ class WebSocketService {
     }
   }
 
-  Future<void> createNewChat(String username) async {
+  Future<void> createNewChat(String username, String publicKey) async {
     int userId = await getLoggedInUserId();
 
     // Check if the chat already exists in _chats
@@ -128,7 +134,7 @@ class WebSocketService {
       );
 
       // If the chat is null (not found), create it and retrieve the Chat object
-      chat ??= await DatabaseHelper.instance.insertChat(username);
+      chat ??= await DatabaseHelper.instance.insertChat(username, publicKey);
 
       // Add the chat to _chats if it's not already added
       if (chat != null) {
@@ -223,7 +229,17 @@ class WebSocketService {
             userId,
           );
 
-          chat ??= await DatabaseHelper.instance.insertChat(sender);
+          if (chat == null) {
+            String? publicKey = await _getUserPublicKey(sender);
+            if (publicKey != null) {
+              chat = await DatabaseHelper.instance.insertChat(
+                sender,
+                publicKey,
+              );
+            } else {
+              // Handle case
+            }
+          }
 
           int chatId = chat?.id ?? -1;
 
@@ -236,6 +252,7 @@ class WebSocketService {
             DateTime createdAt = DateTime.parse(sentAt);
 
             Message receivedMessage = Message(
+              read: false,
               userId: userId,
               text: messageText,
               type: false,
@@ -290,6 +307,28 @@ class WebSocketService {
 
     // Optionally, convert it back to a Map if you want
     _chats = Map.fromEntries(sortedChats);
+  }
+
+  Future<String?> _getUserPublicKey(username) async {
+    if (_authToken == '') {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      _authToken = prefs.getString('jwt_token');
+    }
+    final url = Uri.parse("$BASE_URL/api/user/exists?username=$username");
+
+    final response = await http.get(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $_authToken',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return data['publicKey'];
+    }
+    return null;
   }
 
   void disconnect() {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:chatsocket/services/websocket_service.dart';
 import 'chat_screen.dart';
+import 'dart:convert';
 import 'profile_page.dart';
 import 'package:http/http.dart' as http;
 import 'package:chatsocket/database/database_helper.dart';
@@ -77,12 +78,15 @@ class _MainPageState extends State<MainPage> {
       bool exists = response.statusCode == 200;
 
       if (exists) {
+        final data = jsonDecode(response.body);
+        String publicKey = data['publicKey'];
+
         setState(() {
           _inputBorderColor = Colors.transparent; // Reset border color if valid
         });
 
         if (!_webSocketService.getChatUsers().containsKey(newUsername)) {
-          _webSocketService.createNewChat(newUsername);
+          _webSocketService.createNewChat(newUsername, publicKey);
         }
 
         Navigator.push(

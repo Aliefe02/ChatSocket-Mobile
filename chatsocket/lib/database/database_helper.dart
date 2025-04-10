@@ -30,7 +30,9 @@ class DatabaseHelper {
             email TEXT,
             first_name TEXT,
             last_name TEXT,
-            jwt_token TEXT
+            jwt_token TEXT,
+            public_key TEXT,
+            private_key TEXT
           );
         ''');
 
@@ -38,8 +40,9 @@ class DatabaseHelper {
           CREATE TABLE chats(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL,
-            chat_username TEXT NOT NULL, 
+            chat_username TEXT NOT NULL,
             latest_message TEXT DEFAULT 'No messages yet',
+            public_key TEXT NOT NULL,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
           );
@@ -52,6 +55,7 @@ class DatabaseHelper {
             user_id INTEGER NOT NULL,
             chat_id INTEGER NOT NULL,
             type INTEGER NOT NULL DEFAULT 0,  -- 0 for received, 1 for sent
+            read INTEGER NOT NULL DEFAULT 0,  -- 0 for false, 1 for true
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
             FOREIGN KEY(chat_id) REFERENCES chats(id) ON DELETE CASCADE
@@ -109,7 +113,7 @@ class DatabaseHelper {
   }
 
   // Insert a new Chat (Automatically uses logged-in user)
-  Future<Chat?> insertChat(String chatUsername) async {
+  Future<Chat?> insertChat(String chatUsername, String publicKey) async {
     print("Save new chat called");
     final db = await database;
     int userId = await getLoggedInUserId();
@@ -120,6 +124,7 @@ class DatabaseHelper {
       'user_id': userId,
       'chat_username': chatUsername,
       'latest_message': 'No messages yet',
+      'public_key': publicKey,
       'updated_at': DateTime.now().toIso8601String(),
     }, conflictAlgorithm: ConflictAlgorithm.replace);
 
@@ -147,6 +152,7 @@ class DatabaseHelper {
         chatUsername: results[0]['chat_username'],
         latestMessage: results[0]['latest_message'],
         updatedAt: results[0]['updated_at'],
+        publicKey: results[0]['public_key'],
       );
     } else {
       throw Exception("Chat not found");

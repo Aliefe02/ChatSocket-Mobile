@@ -139,6 +139,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     // Create a new Message object for the received message
     Message receivedMessage = Message(
+      read: false,
       userId: userId,
       text: message,
       type: false, // Received by the user
@@ -151,6 +152,7 @@ class _ChatScreenState extends State<ChatScreen> {
         setState(() {
           _messages.add(receivedMessage);
         });
+        receivedMessage.read = true;
 
         // Scroll to the bottom only if the user is already at the bottom
         if (_scrollController.position.pixels ==
@@ -177,6 +179,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
       // Create a new Message object for the sent message
       Message newMessage = Message(
+        read: true,
         userId: userId,
         text: message,
         type: true,

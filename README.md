@@ -4,6 +4,11 @@ Mobile messaging application with Flutter.
 
 ## Changelog
 
+
+### Version 0.1.2.2
+- **Encryption Service**: This service will be used for end to end encryption. So far it only creates public and private keys.
+- **Database Updates**: Chat model now has public key field to store public key of recipient. Message model has read field that stores if a message is read or not. User model has public and private key fields, private key field is temporary. It will be stored on a more secure location in the future
+
 ### Version 0.1.2
 - **Updated chat list on memory**: Chat details were loaded onto memory on seperate lists. They are now in one Map with each chat storing its id, last message, unread message count (not implemented yet) and last update time.
 - **Reorder chats on new message**: Chats are reordered on the main page when a new message is received or sent.

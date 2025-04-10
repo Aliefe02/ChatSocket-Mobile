@@ -6,6 +6,7 @@ import 'package:chatsocket/constants.dart';
 import 'main_page.dart';
 import 'package:chatsocket/models/user.dart';
 import 'package:chatsocket/database/database_helper.dart';
+import 'package:chatsocket/services/encryption_service.dart';
 
 class RegisterScreen extends StatefulWidget {
   @override
@@ -70,17 +71,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (response.statusCode == 201) {
       String token = response.body.trim();
 
-      // Insert user into SQLite database
+      // 1. Generate RSA key pair
+      final keyMap = await EncryptionService().createKeys();
+
+      // 2. Insert user into SQLite database
       User user = User(
         username: username,
         email: email,
         firstName: firstName,
         lastName: lastName,
         jwtToken: token,
+        publicKey: keyMap['publicKey']!,
+        privateKey: keyMap['privateKey']!,
       );
       await DatabaseHelper.instance.insertUser(user);
 
-      // Save token and username to SharedPreferences
+      // 3. Save token and user info to SharedPreferences
       SharedPreferences prefs = await SharedPreferences.getInstance();
       await prefs.setString('jwt_token', token);
       await prefs.setString('username', username);
@@ -89,7 +95,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       await prefs.setString('lastName', lastName);
       await prefs.setInt('user_id', user.id ?? -1);
 
-      // Navigate to MainPage after registration
+      // 4. Navigate to MainPage
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => MainPage(username: username)),
