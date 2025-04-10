@@ -5,6 +5,9 @@ Mobile messaging application with Flutter.
 ## Changelog
 
 
+### Version 0.1.3
+- **Fixed Bugs**: Fixed register user storing -1 on shared pref instead of user id from database. Fixed query column name typos.
+
 ### Version 0.1.2.2
 - **Encryption Service**: This service will be used for end to end encryption. So far it only creates public and private keys.
 - **Database Updates**: Chat model now has public key field to store public key of recipient. Message model has read field that stores if a message is read or not. User model has public and private key fields, private key field is temporary. It will be stored on a more secure location in the future

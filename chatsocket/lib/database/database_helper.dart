@@ -117,7 +117,9 @@ class DatabaseHelper {
     print("Save new chat called");
     final db = await database;
     int userId = await getLoggedInUserId();
+    print("db logged in user id $userId");
     if (userId == -1) return null; // User ID not found, don't insert
+    print("insert chat user id: $userId");
 
     // Insert the new chat into the 'chats' table and get the inserted chatId
     int chatId = await db.insert('chats', {
@@ -146,12 +148,15 @@ class DatabaseHelper {
 
     if (results.isNotEmpty) {
       // Assuming the Chat object is constructed using these fields
+      print("getchatbyid results: $results");
       return Chat(
         id: results[0]['id'],
-        userId: results[0]['userId'],
+        userId: results[0]['user_id'],
         chatUsername: results[0]['chat_username'],
         latestMessage: results[0]['latest_message'],
-        updatedAt: results[0]['updated_at'],
+        updatedAt: DateTime.tryParse(
+          results[0]['updated_at'],
+        ), // ✅ Convert string to DateTime
         publicKey: results[0]['public_key'],
       );
     } else {

@@ -72,7 +72,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       String token = response.body.trim();
 
       // 1. Generate RSA key pair
-      final keyMap = await EncryptionService().createKeys();
+      // final keyMap = await EncryptionService().createKeys();
 
       // 2. Insert user into SQLite database
       User user = User(
@@ -81,10 +81,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
         firstName: firstName,
         lastName: lastName,
         jwtToken: token,
-        publicKey: keyMap['publicKey']!,
-        privateKey: keyMap['privateKey']!,
+        publicKey: "",
+        privateKey: "",
+        // publicKey: keyMap['publicKey']!,
+        // privateKey: keyMap['privateKey']!,
       );
-      await DatabaseHelper.instance.insertUser(user);
+      int userId = await DatabaseHelper.instance.insertUser(user);
 
       // 3. Save token and user info to SharedPreferences
       SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -93,7 +95,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       await prefs.setString('email', email);
       await prefs.setString('firstName', firstName);
       await prefs.setString('lastName', lastName);
-      await prefs.setInt('user_id', user.id ?? -1);
+      await prefs.setInt('user_id', userId);
 
       // 4. Navigate to MainPage
       Navigator.pushReplacement(

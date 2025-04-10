@@ -124,6 +124,7 @@ class WebSocketService {
 
   Future<void> createNewChat(String username, String publicKey) async {
     int userId = await getLoggedInUserId();
+    print("logged in user id: $userId");
 
     // Check if the chat already exists in _chats
     if (!_chats.containsKey(username)) {

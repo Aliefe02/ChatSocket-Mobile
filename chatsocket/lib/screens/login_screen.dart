@@ -83,7 +83,7 @@ class _LoginScreenState extends State<LoginScreen> {
           await DatabaseHelper.instance.updateUser(updatedUser);
           userId = existingUser.id; // Use existing user ID
         } else {
-          final keyMap = await EncryptionService().createKeys();
+          // final keyMap = await EncryptionService().createKeys();
           // Insert new user into SQLite
           User newUser = User(
             username: username,
@@ -91,8 +91,10 @@ class _LoginScreenState extends State<LoginScreen> {
             firstName: firstName,
             lastName: lastName,
             jwtToken: token,
-            publicKey: keyMap['publicKey']!,
-            privateKey: keyMap['privateKey']!,
+            publicKey: "",
+            privateKey: "",
+            // publicKey: keyMap['publicKey']!,
+            // privateKey: keyMap['privateKey']!,
           );
           userId = await DatabaseHelper.instance.insertUser(newUser);
         }
