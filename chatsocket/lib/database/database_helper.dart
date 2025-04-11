@@ -389,4 +389,26 @@ class DatabaseHelper {
       await batch.commit(noResult: true);
     });
   }
+
+  Future<void> updateUserJwt(String token, int userId) async {
+    final db = await database;
+
+    // Update the JWT field for the user with the given userId
+    await db.update(
+      'users', // Name of your users table
+      {'jwt': token}, // Setting the 'jwt' field to the new token
+      where: 'id = ?', // Condition to find the user by userId
+      whereArgs: [userId], // The value for the userId parameter
+    );
+  }
+
+  Future<void> deleteChatById(int chatId) async {
+    final db = await database;
+
+    await db.transaction((txn) async {
+      await txn.delete('chats', where: 'id = ?', whereArgs: [chatId]);
+    });
+
+    print("Chat with ID $chatId and its messages deleted.");
+  }
 }

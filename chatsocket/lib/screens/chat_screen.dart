@@ -53,7 +53,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _loadMessages() async {
     final chatId = _webSocketService.getChatIdByUsername(widget.username);
 
-    if (chatId == null) return;
+    if (chatId == -1) return;
 
     final dbHelper = DatabaseHelper.instance;
     List<Message> messages = await dbHelper.getLastMessagesByChat(
@@ -78,7 +78,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _loadMoreMessages() async {
     final chatId = _webSocketService.getChatIdByUsername(widget.username);
 
-    if (chatId == null || _isLoadingMore || _oldestMessageId == null) return;
+    if (chatId == -1 || _isLoadingMore || _oldestMessageId == null) return;
 
     setState(() {
       _isLoadingMore = true;
@@ -133,7 +133,7 @@ class _ChatScreenState extends State<ChatScreen> {
       userId: userId,
       text: message,
       type: false,
-      chatId: _webSocketService.getChatIdByUsername(widget.username) ?? -1,
+      chatId: _webSocketService.getChatIdByUsername(widget.username),
     );
 
     if (mounted) {
@@ -166,7 +166,7 @@ class _ChatScreenState extends State<ChatScreen> {
         userId: userId,
         text: message,
         type: true,
-        chatId: _webSocketService.getChatIdByUsername(widget.username) ?? -1,
+        chatId: _webSocketService.getChatIdByUsername(widget.username),
       );
 
       setState(() {

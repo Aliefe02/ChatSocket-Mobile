@@ -20,6 +20,8 @@ class MainPage extends StatefulWidget {
 }
 
 class _MainPageState extends State<MainPage> {
+  Set<String> _showDeleteButtonFor = {};
+
   String? _authToken = '';
   final WebSocketService _webSocketService = WebSocketService.getInstance();
   bool _showInputBox = false;
@@ -61,10 +63,10 @@ class _MainPageState extends State<MainPage> {
   void _startNewChat() async {
     String newUsername = _usernameController.text.trim();
     if (newUsername.isNotEmpty) {
-      if (_authToken == '') {
-        SharedPreferences prefs = await SharedPreferences.getInstance();
-        _authToken = prefs.getString('jwt_token');
-      }
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      _authToken = prefs.getString('jwt_token');
+
+      print("jwt token: $_authToken");
       final url = Uri.parse("$BASE_URL/api/user/exists?username=$newUsername");
 
       final response = await http.get(
@@ -106,6 +108,19 @@ class _MainPageState extends State<MainPage> {
         });
       }
     }
+  }
+
+  void _deleteChat(String username) {
+    DatabaseHelper.instance.deleteChatById(
+      _webSocketService.getChatIdByUsername(username),
+    );
+    _webSocketService.deleteChatByUsername(username);
+
+    setState(() {
+      _showDeleteButtonFor.remove(
+        username,
+      ); // Hide delete button after deletion
+    });
   }
 
   Future<void> _loadAndPrintUsers() async {
@@ -239,13 +254,26 @@ class _MainPageState extends State<MainPage> {
                         contentPadding: EdgeInsets.symmetric(horizontal: 20),
                       ),
                       style: TextStyle(color: Colors.white),
+                      onChanged: (text) {
+                        if (_inputBorderColor == Colors.red) {
+                          setState(() {
+                            _inputBorderColor =
+                                Colors
+                                    .transparent; // Reset border color when text changes
+                          });
+                        }
+                      },
                     ),
                   ),
                   SizedBox(width: 8),
-                  FloatingActionButton(
-                    onPressed: _startNewChat,
-                    backgroundColor: Color.fromARGB(255, 18, 194, 86),
-                    child: Icon(Icons.check, color: Colors.white),
+                  SizedBox(
+                    width: 48,
+                    height: 48,
+                    child: FloatingActionButton(
+                      onPressed: _startNewChat,
+                      backgroundColor: Color.fromARGB(255, 18, 194, 86),
+                      child: Icon(Icons.check, color: Colors.white, size: 24),
+                    ),
                   ),
                 ],
               ),
@@ -269,41 +297,59 @@ class _MainPageState extends State<MainPage> {
                       horizontal: 8.0,
                       vertical: 12.0, // Increased vertical space between chats
                     ),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.black,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.white.withOpacity(0.2),
-                            blurRadius: 6,
-                            spreadRadius: 5,
-                            offset: Offset(0, 0),
-                          ),
-                        ],
-                      ),
-                      child: ListTile(
-                        title: Text(
-                          username,
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                        subtitle: Text(
-                          lastMessage,
-                          style: TextStyle(color: Colors.white70),
-                        ),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder:
-                                  (context) => ChatScreen(username: username),
+                    child: GestureDetector(
+                      onLongPress: () {
+                        setState(() {
+                          _showDeleteButtonFor.add(username);
+                        });
+                      },
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.black,
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.white.withOpacity(0.2),
+                              blurRadius: 6,
+                              spreadRadius: 5,
+                              offset: Offset(0, 0),
                             ),
-                          );
-                        },
+                          ],
+                        ),
+                        child: ListTile(
+                          title: Text(
+                            username,
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                          subtitle: Text(
+                            lastMessage,
+                            style: TextStyle(color: Colors.white70),
+                          ),
+                          trailing:
+                              _showDeleteButtonFor.contains(username)
+                                  ? IconButton(
+                                    icon: Icon(Icons.delete, color: Colors.red),
+                                    onPressed: () => _deleteChat(username),
+                                  )
+                                  : null,
+                          onTap: () async {
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder:
+                                    (context) => ChatScreen(username: username),
+                              ),
+                            );
+                            setState(() {
+                              _showDeleteButtonFor
+                                  .clear(); // Hide all delete buttons after return
+                            });
+                          },
+                        ),
                       ),
                     ),
                   );

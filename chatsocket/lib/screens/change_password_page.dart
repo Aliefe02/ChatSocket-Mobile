@@ -1,4 +1,10 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:chatsocket/constants.dart';
+import 'package:chatsocket/database/database_helper.dart';
+import 'package:sqflite/sqflite.dart';
 
 class ChangePasswordPage extends StatefulWidget {
   @override
@@ -16,7 +22,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
   bool isReenterPasswordValid = true;
 
   // Function to check if passwords match
-  void _checkPasswordMatch() {
+  void _checkPasswordMatch() async {
     setState(() {
       if (passwordController.text == reenterPasswordController.text) {
         isPasswordValid = true;
@@ -26,6 +32,44 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
         isReenterPasswordValid = false;
       }
     });
+  }
+
+  Future<void> _changePassword() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? authToken = prefs.getString('jwt_token');
+    int userId = prefs.getInt('userId') ?? -1;
+
+    // Retrieve the password values
+    String newPassword = passwordController.text.trim();
+    String confirmPassword = reenterPasswordController.text.trim();
+
+    if (newPassword != confirmPassword) {
+      // You can handle mismatched passwords here (e.g., show a message)
+      print("Passwords do not match!");
+      return;
+    }
+
+    final url = Uri.parse("$BASE_URL/api/user/update-password");
+
+    final response = await http.put(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $authToken',
+      },
+      body: jsonEncode({'password': newPassword}),
+    );
+
+    if (response.statusCode == 200) {
+      String token = response.body.trim();
+      DatabaseHelper.instance.updateUserJwt(token, userId);
+      await prefs.setString('jwt_token', token);
+      print("new token: $token");
+      Navigator.pop(context);
+    } else {
+      // Handle error (e.g., show a failure message)
+      print('Password change failed');
+    }
   }
 
   @override
@@ -67,12 +111,8 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
               ElevatedButton(
                 onPressed:
                     isPasswordValid && isReenterPasswordValid
-                        ? () {
-                          // Call your password change API here
-                          // For now, let's just navigate back to the profile page
-                          Navigator.pop(context);
-                        }
-                        : null,
+                        ? _changePassword // Call _changePassword if the passwords are valid
+                        : null, // Disable the button if the passwords are invalid
                 child: Text(
                   'Change Password',
                   style: TextStyle(color: Colors.white), // White text color

@@ -5,6 +5,11 @@ Mobile messaging application with Flutter.
 ## Changelog
 
 
+### Version 0.1.4
+- **Delete Chats**: When a chat is long pressed, a button will appear on it. When pressed, that chat and all its messages will be deleted.
+- **Update password**: Update password page now updates password on the server, also a new jwt token is received upon password change.
+- **Scroll Down Button**: In chat screen, if user is not at the bottom, a button will appear on the right bottom, when pressed it will scroll to the bottom.
+
 ### Version 0.1.3
 - **Fixed Bugs**: Fixed register user storing -1 on shared pref instead of user id from database. Fixed query column name typos.
 

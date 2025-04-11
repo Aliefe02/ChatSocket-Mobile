@@ -98,7 +98,7 @@ class WebSocketService {
         userId: userId,
         text: msg,
         type: false, // Received by the user
-        chatId: getChatIdByUsername(sender) ?? -1,
+        chatId: getChatIdByUsername(sender),
       );
       await DatabaseHelper.instance.insertMessage(receivedMessage, now);
     }
@@ -311,10 +311,9 @@ class WebSocketService {
   }
 
   Future<String?> _getUserPublicKey(username) async {
-    if (_authToken == '') {
-      SharedPreferences prefs = await SharedPreferences.getInstance();
-      _authToken = prefs.getString('jwt_token');
-    }
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    _authToken = prefs.getString('jwt_token');
+
     final url = Uri.parse("$BASE_URL/api/user/exists?username=$username");
 
     final response = await http.get(
@@ -343,8 +342,12 @@ class WebSocketService {
     return _chats;
   }
 
-  int? getChatIdByUsername(String username) {
+  int getChatIdByUsername(String username) {
     return int.parse(_chats[username]?[0] ?? "-1");
+  }
+
+  void deleteChatByUsername(String username) {
+    _chats.remove(username);
   }
 
   String getLastMessage(String username) {
