@@ -3,6 +3,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'change_password_page.dart';
 import 'login_screen.dart';
 import 'package:chatsocket/services/websocket_service.dart';
+import 'package:chatsocket/constants.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:chatsocket/database/database_helper.dart';
 
 class ProfilePage extends StatefulWidget {
   @override
@@ -115,12 +119,8 @@ class _ProfilePageState extends State<ProfilePage> {
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 12.0),
                 child: ElevatedButton(
-                  onPressed: () {
-                    setState(() {
-                      firstName = firstNameController.text;
-                      lastName = lastNameController.text;
-                    });
-                  },
+                  onPressed:
+                      _saveProfile, // Call the _saveProfile function when pressed
                   child: Text('Save', style: TextStyle(color: Colors.white)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Color.fromARGB(255, 18, 194, 86),
@@ -185,6 +185,40 @@ class _ProfilePageState extends State<ProfilePage> {
         style: TextStyle(color: Colors.white),
       ),
     );
+  }
+
+  void _saveProfile() async {
+    firstName = firstNameController.text;
+    lastName = lastNameController.text;
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? authToken = prefs.getString('jwt_token');
+    int userId = prefs.getInt('userId') ?? -1;
+    final url = Uri.parse("$BASE_URL/api/user/update-name");
+
+    final response = await http.put(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $authToken',
+      },
+      body: jsonEncode({'firstName': firstName, 'lastName': lastName}),
+    );
+
+    if (response.statusCode == 200) {
+      DatabaseHelper.instance.updateUserFirstNameLastName(
+        userId,
+        firstName,
+        lastName,
+      );
+      await prefs.setString('firstName', firstName);
+      await prefs.setString('lastName', lastName);
+      Navigator.pop(context);
+    } else {
+      // Handle error (e.g., show a failure message)
+      print('User details change failed');
+    }
+    setState(() {});
+    // Add your code here to handle further logic (e.g., API call, saving to database)
   }
 
   // Logout function

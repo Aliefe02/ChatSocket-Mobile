@@ -190,6 +190,10 @@ class _MainPageState extends State<MainPage> {
                         onPressed: () {
                           setState(() {
                             _showInputBox = !_showInputBox;
+                            if (!_showInputBox) {
+                              _usernameController.clear();
+                              _inputBorderColor = Colors.transparent;
+                            }
                           });
                         },
                       ),

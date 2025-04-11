@@ -402,6 +402,25 @@ class DatabaseHelper {
     );
   }
 
+  Future<void> updateUserFirstNameLastName(
+    int userId,
+    String firstName,
+    String lastName,
+  ) async {
+    final db = await database;
+
+    // Update the JWT field for the user with the given userId
+    await db.update(
+      'users', // Name of your users table
+      {
+        'first_name': firstName,
+        'last_name': lastName,
+      }, // Setting the 'jwt' field to the new token
+      where: 'id = ?', // Condition to find the user by userId
+      whereArgs: [userId], // The value for the userId parameter
+    );
+  }
+
   Future<void> deleteChatById(int chatId) async {
     final db = await database;
 

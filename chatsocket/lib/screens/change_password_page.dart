@@ -4,7 +4,6 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:chatsocket/constants.dart';
 import 'package:chatsocket/database/database_helper.dart';
-import 'package:sqflite/sqflite.dart';
 
 class ChangePasswordPage extends StatefulWidget {
   @override

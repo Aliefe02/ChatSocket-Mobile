@@ -5,6 +5,10 @@ Mobile messaging application with Flutter.
 ## Changelog
 
 
+### Version 0.1.4.2
+- **Update First and Last name**: On profile page, you can now update first and last names and hit save.
+- **New Chat User Validation**: When creating a new chat, if user does not exist, border is turning red, when input changes, border turns back to transparent. If input box is closed, entered text is cleared.
+
 ### Version 0.1.4
 - **Delete Chats**: When a chat is long pressed, a button will appear on it. When pressed, that chat and all its messages will be deleted.
 - **Update password**: Update password page now updates password on the server, also a new jwt token is received upon password change.
