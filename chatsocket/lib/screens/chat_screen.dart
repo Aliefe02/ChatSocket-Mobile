@@ -162,7 +162,7 @@ class _ChatScreenState extends State<ChatScreen> {
       int userId = await getLoggedInUserId();
 
       Message newMessage = Message(
-        read: true,
+        read: false,
         userId: userId,
         text: message,
         type: true,

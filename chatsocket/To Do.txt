@@ -12,3 +12,4 @@
 - what to do if there is no internet connection (dont allow sending new messages)
 - try the condition where i am in chat of user a and user b sends message
 - password show-hide
+- dont send messages if there is no internet connection

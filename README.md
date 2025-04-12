@@ -4,6 +4,8 @@ Mobile messaging application with Flutter.
 
 ## Changelog
 
+### Version 0.1.4.3
+- **Fix Colors**: Login and register pages had different shade of black, now they are same as the rest of the app, and shadows are also changed.
 
 ### Version 0.1.4.2
 - **Update First and Last name**: On profile page, you can now update first and last names and hit save.
